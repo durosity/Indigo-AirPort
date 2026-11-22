@@ -25,7 +25,7 @@
         <Name>Restart Base Station</Name>
         <CallbackMethod>action_restart</CallbackMethod>
     </Action>
-    <Action id="refresh" deviceFilter="self.airportBaseStation">
+    <Action id="refresh" deviceFilter="self">
         <Name>Refresh Now</Name>
         <CallbackMethod>action_refresh</CallbackMethod>
     </Action>

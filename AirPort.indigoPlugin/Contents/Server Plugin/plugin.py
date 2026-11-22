@@ -16,7 +16,9 @@ import indigo
 
 from airport_acp import ACPClient, ACPError, AuthenticationError
 from airport_acp import wifi as wifi_ops
-from airport_acp.device import read_states
+from airport_acp.device import read_states, _uptime_text
+from airport_legacy import (LegacyBaseStation, LegacyError, SNMPError, SNMPTimeout,
+                            discover as legacy_discover, read_states as legacy_read_states)
 
 try:
     from zeroconf import Zeroconf, ServiceBrowser, ServiceStateChange
@@ -25,6 +27,7 @@ except ImportError:  # plugin still works by IP address without Bonjour
 
 PLUGIN_ID = "com.durosity.indigoplugin.airport"
 DEVICE_TYPE = "airportBaseStation"
+LEGACY_TYPE = "legacyBaseStation"
 BONJOUR_SERVICE = "_airport._tcp.local."
 RESTART_GRACE = 300     # seconds a unit may stay unreachable after we restart it
 RESTART_POLL = 15       # poll interval while waiting for a restart to finish
@@ -203,6 +206,9 @@ class Plugin(indigo.PluginBase):
             lock.release()
 
     def _poll_locked(self, dev):
+        if dev.deviceTypeId == LEGACY_TYPE:
+            self._poll_legacy(dev)
+            return
         now = time.time()
         if not dev.pluginProps.get("password"):
             self._set_status(dev, "no password", "not set", error=True)
@@ -295,9 +301,9 @@ class Plugin(indigo.PluginBase):
 
     def _set_status(self, dev, status, credential=None, error=False):
         updates = [{"key": "status", "value": status}]
-        if credential is not None:
+        if credential is not None and "credentialStatus" in dev.states:
             updates.append({"key": "credentialStatus", "value": credential})
-        if status == "restarting":
+        if status == "restarting" and dev.deviceTypeId == DEVICE_TYPE:
             # Keep the on/off value (HomeKit still sees the setting) but show
             # "restarting" in the State column.
             updates.append({"key": "onOffState", "value": dev.onState, "uiValue": "restarting"})
@@ -307,6 +313,39 @@ class Plugin(indigo.PluginBase):
     @staticmethod
     def _on_off_ui(on, pending):
         return ("on" if on else "off") + (" (pending)" if pending else "")
+
+    # ------------------------------------------------------------------ Graphite / Snow
+    def _poll_legacy(self, dev):
+        now = time.time()
+        self.next_poll[dev.id] = now + self._interval(dev)
+        address = dev.pluginProps.get("address", "")
+        if not dev.pluginProps.get("password"):
+            self._set_status(dev, "no password", error=True)
+            return
+        try:
+            states, _raw = legacy_read_states(LegacyBaseStation(address, dev.pluginProps.get("password")))
+        except SNMPTimeout:
+            # SNMPv1 ignores a wrong community, so tell "wrong password" apart
+            # from "unreachable" by asking the unit to identify itself.
+            try:
+                answered = bool(legacy_discover(address, timeout=1.5))
+            except OSError:
+                answered = False
+            status = "no SNMP reply (check password)" if answered else "offline"
+            if dev.states.get("status") != status:
+                self.logger.warning('"%s": %s' % (dev.name, status))
+            self._set_status(dev, status, error=True)
+            return
+        except (SNMPError, LegacyError, OSError) as err:
+            self.logger.warning('"%s": read failed: %s' % (dev.name, err))
+            self._set_status(dev, "error", error=True)
+            return
+        states["uptime"] = _uptime_text(states.get("uptimeSeconds", 0))
+        updates = [{"key": k, "value": v} for k, v in states.items() if k in dev.states]
+        updates += [{"key": "status", "value": "online"},
+                    {"key": "lastUpdate", "value": time.strftime("%Y-%m-%d %H:%M:%S")}]
+        dev.updateStatesOnServer(updates)
+        dev.setErrorStateOnServer(None)
 
     # ------------------------------------------------------------------ Wi-Fi changes
     def _backup_dir(self):
