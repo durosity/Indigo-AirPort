@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<MenuItems>
+    <MenuItem id="listDiscovered">
+        <Name>Log Discovered Base Stations</Name>
+        <CallbackMethod>menu_list_discovered</CallbackMethod>
+    </MenuItem>
+    <MenuItem id="createDiscovered">
+        <Name>Create Devices for Discovered Base Stations</Name>
+        <CallbackMethod>menu_create_discovered</CallbackMethod>
+    </MenuItem>
+    <MenuItem id="refreshAll">
+        <Name>Refresh All Base Stations</Name>
+        <CallbackMethod>menu_refresh_all</CallbackMethod>
+    </MenuItem>
+</MenuItems>

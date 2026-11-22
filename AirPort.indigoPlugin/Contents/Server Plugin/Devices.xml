@@ -1,0 +1,195 @@
+<?xml version="1.0"?>
+<Devices>
+    <Device type="relay" id="airportBaseStation">
+        <Name>AirPort Base Station</Name>
+        <ConfigUI>
+            <Field id="address" type="textfield">
+                <Label>IP Address or Hostname:</Label>
+            </Field>
+            <Field id="password" type="textfield" secure="true">
+                <Label>Admin Password:</Label>
+            </Field>
+            <Field id="passwordNote" type="label" fontSize="small" alignWithControl="true">
+                <Label>Stored unencrypted in the Indigo database. Never written to the log.</Label>
+            </Field>
+            <Field id="pollInterval" type="textfield" defaultValue="300">
+                <Label>Poll Interval (seconds):</Label>
+            </Field>
+            <Field id="restartAfterChange" type="checkbox" defaultValue="true">
+                <Label>Restart after Wi-Fi changes:</Label>
+            </Field>
+            <Field id="restartNote" type="label" fontSize="small" alignWithControl="true">
+                <Label>AirPorts apply configuration changes on restart (about 1-2 minutes offline). If unticked, changes show as pending until the next restart.</Label>
+            </Field>
+            <Field id="SupportsOnState" type="checkbox" defaultValue="true" hidden="true"/>
+            <Field id="SupportsStatusRequest" type="checkbox" defaultValue="true" hidden="true"/>
+        </ConfigUI>
+        <States>
+            <State id="status">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Status</TriggerLabel>
+                <ControlPageLabel>Status</ControlPageLabel>
+            </State>
+            <State id="credentialStatus">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Credential Status</TriggerLabel>
+                <ControlPageLabel>Credential Status</ControlPageLabel>
+            </State>
+            <State id="name">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Base Station Name</TriggerLabel>
+                <ControlPageLabel>Base Station Name</ControlPageLabel>
+            </State>
+            <State id="model">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Model</TriggerLabel>
+                <ControlPageLabel>Model</ControlPageLabel>
+            </State>
+            <State id="productId">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>Product ID</TriggerLabel>
+                <ControlPageLabel>Product ID</ControlPageLabel>
+            </State>
+            <State id="firmware">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Firmware</TriggerLabel>
+                <ControlPageLabel>Firmware</ControlPageLabel>
+            </State>
+            <State id="serialNumber">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Serial Number</TriggerLabel>
+                <ControlPageLabel>Serial Number</ControlPageLabel>
+            </State>
+            <State id="uptimeSeconds">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>Uptime (seconds)</TriggerLabel>
+                <ControlPageLabel>Uptime (seconds)</ControlPageLabel>
+            </State>
+            <State id="uptime">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Uptime</TriggerLabel>
+                <ControlPageLabel>Uptime</ControlPageLabel>
+            </State>
+            <State id="temperatureC">
+                <ValueType>Number</ValueType>
+                <TriggerLabel>Temperature (°C)</TriggerLabel>
+                <ControlPageLabel>Temperature (°C)</ControlPageLabel>
+            </State>
+            <State id="problemCount">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>Problem Count</TriggerLabel>
+                <ControlPageLabel>Problem Count</ControlPageLabel>
+            </State>
+            <State id="problems">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Problems</TriggerLabel>
+                <ControlPageLabel>Problems</ControlPageLabel>
+            </State>
+            <State id="wifiEnabled">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>Wi-Fi Enabled (setting)</TriggerLabel>
+                <ControlPageLabel>Wi-Fi Enabled (setting)</ControlPageLabel>
+            </State>
+            <State id="wifiLive">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Wi-Fi Live State</TriggerLabel>
+                <ControlPageLabel>Wi-Fi Live State</ControlPageLabel>
+            </State>
+            <State id="wifiPending">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>Wi-Fi Change Pending Restart</TriggerLabel>
+                <ControlPageLabel>Wi-Fi Change Pending Restart</ControlPageLabel>
+            </State>
+            <State id="radioCount">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>Radio Count</TriggerLabel>
+                <ControlPageLabel>Radio Count</ControlPageLabel>
+            </State>
+            <State id="radio1_state">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Radio 1 State</TriggerLabel>
+                <ControlPageLabel>Radio 1 State</ControlPageLabel>
+            </State>
+            <State id="radio1_channel">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>Radio 1 Channel</TriggerLabel>
+                <ControlPageLabel>Radio 1 Channel</ControlPageLabel>
+            </State>
+            <State id="radio1_network">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Radio 1 Network</TriggerLabel>
+                <ControlPageLabel>Radio 1 Network</ControlPageLabel>
+            </State>
+            <State id="radio2_state">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Radio 2 State</TriggerLabel>
+                <ControlPageLabel>Radio 2 State</ControlPageLabel>
+            </State>
+            <State id="radio2_channel">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>Radio 2 Channel</TriggerLabel>
+                <ControlPageLabel>Radio 2 Channel</ControlPageLabel>
+            </State>
+            <State id="radio2_network">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Radio 2 Network</TriggerLabel>
+                <ControlPageLabel>Radio 2 Network</ControlPageLabel>
+            </State>
+            <State id="clientCount">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>Wireless Clients</TriggerLabel>
+                <ControlPageLabel>Wireless Clients</ControlPageLabel>
+            </State>
+            <State id="ipAddress">
+                <ValueType>String</ValueType>
+                <TriggerLabel>IP Address</TriggerLabel>
+                <ControlPageLabel>IP Address</ControlPageLabel>
+            </State>
+            <State id="macAddress">
+                <ValueType>String</ValueType>
+                <TriggerLabel>MAC Address</TriggerLabel>
+                <ControlPageLabel>MAC Address</ControlPageLabel>
+            </State>
+            <State id="router">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Router</TriggerLabel>
+                <ControlPageLabel>Router</ControlPageLabel>
+            </State>
+            <State id="subnetMask">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Subnet Mask</TriggerLabel>
+                <ControlPageLabel>Subnet Mask</ControlPageLabel>
+            </State>
+            <State id="natEnabled">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>NAT Enabled</TriggerLabel>
+                <ControlPageLabel>NAT Enabled</ControlPageLabel>
+            </State>
+            <State id="dhcpServerEnabled">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>DHCP Server Enabled</TriggerLabel>
+                <ControlPageLabel>DHCP Server Enabled</ControlPageLabel>
+            </State>
+            <State id="ledMode">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>LED Mode</TriggerLabel>
+                <ControlPageLabel>LED Mode</ControlPageLabel>
+            </State>
+            <State id="timeZone">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Time Zone</TriggerLabel>
+                <ControlPageLabel>Time Zone</ControlPageLabel>
+            </State>
+            <State id="ntpServer">
+                <ValueType>String</ValueType>
+                <TriggerLabel>NTP Server</TriggerLabel>
+                <ControlPageLabel>NTP Server</ControlPageLabel>
+            </State>
+            <State id="lastUpdate">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Last Update</TriggerLabel>
+                <ControlPageLabel>Last Update</ControlPageLabel>
+            </State>
+        </States>
+    </Device>
+</Devices>

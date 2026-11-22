@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<PluginConfig>
+    <Field id="bonjourEnabled" type="checkbox" defaultValue="true">
+        <Label>Watch Bonjour for live Wi-Fi state:</Label>
+    </Field>
+    <Field id="bonjourNote" type="label" fontSize="small" alignWithControl="true">
+        <Label>Base stations on the same network (or reachable through an mDNS proxy) report their live Wi-Fi state without logging in.</Label>
+    </Field>
+    <Field id="sep1" type="separator"/>
+    <Field id="autoCreate" type="checkbox" defaultValue="false" enabledBindingId="bonjourEnabled">
+        <Label>Auto-create devices for discovered base stations:</Label>
+    </Field>
+    <Field id="defaultPassword" type="textfield" secure="true" visibleBindingId="autoCreate" visibleBindingValue="true">
+        <Label>Admin password for new devices:</Label>
+    </Field>
+    <Field id="deviceFolder" type="textfield" defaultValue="AirPort" visibleBindingId="autoCreate" visibleBindingValue="true">
+        <Label>Create in folder:</Label>
+    </Field>
+    <Field id="autoCreateNote" type="label" fontSize="small" alignWithControl="true" visibleBindingId="autoCreate" visibleBindingValue="true">
+        <Label>Each base station is created once. If you delete an auto-created device it will not be recreated; use the "Create Devices for Discovered Base Stations" menu item to bring it back. The password is stored unencrypted and never logged; leave it blank to enter passwords per device.</Label>
+    </Field>
+    <Field id="sep2" type="separator"/>
+    <Field id="showDebugInfo" type="checkbox" defaultValue="false">
+        <Label>Enable debug logging:</Label>
+    </Field>
+    <Field id="traceProtocol" type="checkbox" defaultValue="false" visibleBindingId="showDebugInfo" visibleBindingValue="true">
+        <Label>Include ACP protocol trace:</Label>
+    </Field>
+    <Field id="debugNote" type="label" fontSize="small" alignWithControl="true">
+        <Label>Passwords and Wi-Fi keys are never logged, even in debug mode.</Label>
+    </Field>
+</PluginConfig>

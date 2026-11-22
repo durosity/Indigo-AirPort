@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<Actions>
+    <Action id="setRadio" deviceFilter="self.airportBaseStation">
+        <Name>Set Wi-Fi Radio On/Off</Name>
+        <CallbackMethod>action_set_radio</CallbackMethod>
+        <ConfigUI>
+            <Field id="radio" type="menu" defaultValue="all">
+                <Label>Radio:</Label>
+                <List>
+                    <Option value="all">All radios</Option>
+                    <Option value="1">Radio 1 (usually 2.4 GHz)</Option>
+                    <Option value="2">Radio 2 (usually 5 GHz)</Option>
+                </List>
+            </Field>
+            <Field id="state" type="menu" defaultValue="on">
+                <Label>Turn:</Label>
+                <List>
+                    <Option value="on">On</Option>
+                    <Option value="off">Off</Option>
+                </List>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="restart" deviceFilter="self.airportBaseStation">
+        <Name>Restart Base Station</Name>
+        <CallbackMethod>action_restart</CallbackMethod>
+    </Action>
+    <Action id="refresh" deviceFilter="self.airportBaseStation">
+        <Name>Refresh Now</Name>
+        <CallbackMethod>action_refresh</CallbackMethod>
+    </Action>
+</Actions>
