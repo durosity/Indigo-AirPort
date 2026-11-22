@@ -17,7 +17,9 @@ import indigo
 from airport_acp import ACPClient, ACPError, AuthenticationError
 from airport_acp import wifi as wifi_ops
 from airport_acp.device import read_states, _uptime_text
-from airport_acp.v1 import ACPv1Client, read_states as v1_read_states
+from airport_acp.v1 import ACPv1Client, read_states as v1_read_states, decode as v1_decode
+from airport_acp.scan import scan as acp_scan, GEN_V1, GEN_CURRENT
+from airport_acp.values import decode as acp_decode
 from airport_legacy import (LegacyBaseStation, LegacyError, SNMPError, SNMPTimeout,
                             discover as legacy_discover, read_states as legacy_read_states)
 
@@ -610,6 +612,79 @@ class Plugin(indigo.PluginBase):
             dev.name, address, entry["txt"].get("syAP", "?"),
             "" if props["password"] else "; enter its admin password in the device settings"))
         return dev
+
+    # ------------------------------------------------------------------ network scan
+    def menu_scan_network(self, values_dict, menu_id):
+        network = (values_dict.get("network") or "").strip()
+        try:
+            import ipaddress
+            ipaddress.ip_network(network, strict=False)
+        except ValueError:
+            errors = indigo.Dict()
+            errors["network"] = "Enter a network such as 10.0.9.0/24."
+            return False, values_dict, errors
+        create = bool(values_dict.get("createDevices", True))
+        threading.Thread(target=self._scan_network, args=(network, create), daemon=True).start()
+        return True
+
+    def _scan_network(self, network, create):
+        self.logger.info("scanning %s for AirPort base stations..." % network)
+        try:
+            found = acp_scan(network)
+        except Exception as err:
+            self.logger.error("scan of %s failed: %s" % (network, err))
+            return
+        if not found:
+            self.logger.info("no AirPort base stations found on %s" % network)
+            return
+        for result in found:
+            host, gen = result["host"], result["generation"]
+            label = {GEN_V1: "early model (AirPort Snow era)", GEN_CURRENT: "802.11n/ac"}.get(gen, gen)
+            existing = self._device_for_address(host, result["macs"])
+            self.logger.info("found %s at %s%s" % (label, host,
+                             ' (device "%s")' % existing.name if existing else ""))
+            if create and not existing and gen in (GEN_V1, GEN_CURRENT):
+                self._create_scanned(host, gen, result["macs"])
+
+    def _device_for_address(self, host, macs=None):
+        wanted = {_norm_mac(m) for m in (macs or {}).values()}
+        for dev in indigo.devices.iter("self"):
+            if dev.pluginProps.get("address", "") == host:
+                return dev
+            dev_mac = _norm_mac(dev.pluginProps.get("macAddress") or dev.states.get("macAddress"))
+            if dev_mac and dev_mac in wanted:
+                return dev
+        return None
+
+    def _create_scanned(self, host, gen, macs):
+        password = self.pluginPrefs.get("defaultPassword", "")
+        name = ""
+        if password:   # best effort: use the unit's own name
+            try:
+                if gen == GEN_V1:
+                    raw = ACPv1Client(host, password, timeout=5).get_raw(["syNm"]).get("syNm")
+                    name = v1_decode("syNm", raw) if isinstance(raw, bytes) else ""
+                else:
+                    with ACPClient(host, password, timeout=5) as client:
+                        raw = client.get_raw(["syNm"]).get("syNm")
+                    name = acp_decode("syNm", raw) if isinstance(raw, bytes) else ""
+            except Exception:
+                name = ""
+        type_id = V1_TYPE if gen == GEN_V1 else DEVICE_TYPE
+        base = name or ("AirPort Snow %s" % host if gen == GEN_V1 else "AirPort %s" % host)
+        props = {"address": host, "password": password, "pollInterval": "300"}
+        if gen == GEN_CURRENT:
+            props.update({"restartAfterChange": True, "SupportsOnState": True, "SupportsStatusRequest": True,
+                          "macAddress": _norm_mac(macs.get("waMA") or macs.get("laMA") or "")})
+        try:
+            dev = indigo.device.create(protocol=indigo.kProtocol.Plugin, address=host,
+                                       name=self._unique_name(base), pluginId=self.pluginId,
+                                       deviceTypeId=type_id, props=props, folder=self._folder_id())
+        except Exception as err:
+            self.logger.error('could not create a device for %s: %s' % (host, err))
+            return
+        self.logger.info('created device "%s" for %s%s' % (
+            dev.name, host, "" if password else "; enter its admin password in the device settings"))
 
     def menu_create_discovered(self):
         if not self.bonjour:

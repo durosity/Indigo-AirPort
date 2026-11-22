@@ -414,6 +414,26 @@
                 <TriggerLabel>Last Update</TriggerLabel>
                 <ControlPageLabel>Last Update</ControlPageLabel>
             </State>
+            <State id="firmware">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Firmware</TriggerLabel>
+                <ControlPageLabel>Firmware</ControlPageLabel>
+            </State>
+            <State id="description">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Firmware Description</TriggerLabel>
+                <ControlPageLabel>Firmware Description</ControlPageLabel>
+            </State>
+            <State id="macAddress">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Ethernet MAC Address</TriggerLabel>
+                <ControlPageLabel>Ethernet MAC Address</ControlPageLabel>
+            </State>
+            <State id="wifiMacAddress">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Wi-Fi MAC Address</TriggerLabel>
+                <ControlPageLabel>Wi-Fi MAC Address</ControlPageLabel>
+            </State>
         </States>
         <UiDisplayStateId>status</UiDisplayStateId>
     </Device>

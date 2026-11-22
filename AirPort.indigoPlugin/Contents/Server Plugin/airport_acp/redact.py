@@ -11,7 +11,7 @@ library for display passes through redact().
 
 REDACTED = "<redacted>"
 SECRET_KEYS = frozenset({"raCr", "raWE", "password", "syPW"})
-SECRET_TOP_LEVEL = frozenset({"syPW", "raCr", "raWE"})
+SECRET_TOP_LEVEL = frozenset({"syPW", "syPR", "syGP", "raCr", "raWE", "pePW", "moPW", "auNP"})
 
 
 def redact_value(value):

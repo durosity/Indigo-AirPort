@@ -33,7 +33,7 @@ print("   not returned:", " ".join(missing) or "none")
 print("== stored password matches:", {True: "yes", False: "NO", None: "n/a"}[client.password_matches_device()])
 
 if "--survey" in sys.argv:
-    codes = sorted(set(PROPERTIES) - set(TAGS) - SECRET_TOP_LEVEL - {"usrd"})
+    codes = sorted(set(PROPERTIES) - set(TAGS) - SECRET_TOP_LEVEL - SECRET_TAGS - {"usrd"})
     found = {}
     for i in range(0, len(codes), 25):
         try:

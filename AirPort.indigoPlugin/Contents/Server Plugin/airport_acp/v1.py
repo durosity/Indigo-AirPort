@@ -67,9 +67,16 @@ TAGS = {
     "moAD": ("uint", False, "Automatic dial"),
     "moCC": ("uint", False, "Phone country code"),
     "moPN": ("str", True, "Primary phone number"),
+    "syVs": ("str", False, "Firmware version"),
+    "syDs": ("str", False, "System description"),
+    "syAP": ("uint", False, "Product ID"),
+    "waMA": ("mac", False, "WAN (Ethernet) MAC address"),
+    "laMA": ("mac", False, "LAN MAC address"),
+    "raMA": ("mac", False, "Wi-Fi MAC address"),
+    "leAc": ("uint", False, "Status light mode"),
     "moAP": ("str", True, "Secondary phone number"),
 }
-SECRET_TAGS = frozenset({"syPW", "syPR", "raWE", "moPN", "moAP"})
+SECRET_TAGS = frozenset({"syPW", "syPR", "syGP", "raWE", "raCr", "moPN", "moAP", "moPW", "pePW", "auNP"})
 
 
 def _xor(data):
@@ -83,6 +90,8 @@ def decode(tag, raw):
             return raw.split(b"\x00", 1)[0].decode("mac_roman", "replace")
         if kind == "ip":
             return socket.inet_ntoa(raw[:4])
+        if kind == "mac":
+            return ":".join("%02x" % b for b in raw[:6])
         if kind == "uint":
             return int.from_bytes(raw, "big") if raw else 0
     except (ValueError, OSError):
@@ -170,6 +179,10 @@ def read_states(client):
         "dhcpServerEnabled": bool(v.get("raDS")) if isinstance(v.get("raDS"), int) else False,
         "bridging": bool(v.get("raWB")) if isinstance(v.get("raWB"), int) else False,
         "domainName": v.get("waDN", ""),
+        "firmware": v.get("syVs", ""),
+        "description": v.get("syDs", ""),
+        "macAddress": v.get("waMA", ""),
+        "wifiMacAddress": v.get("raMA", ""),
     }
     wm = v.get("raWM")
     if isinstance(wm, str):

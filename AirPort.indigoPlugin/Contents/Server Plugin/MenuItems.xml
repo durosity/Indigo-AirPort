@@ -8,6 +8,25 @@
         <Name>Create Devices for Discovered Base Stations</Name>
         <CallbackMethod>menu_create_discovered</CallbackMethod>
     </MenuItem>
+    <MenuItem id="scanNetwork">
+        <Name>Scan Network for Base Stations...</Name>
+        <CallbackMethod>menu_scan_network</CallbackMethod>
+        <ButtonTitle>Scan</ButtonTitle>
+        <ConfigUI>
+            <Field id="network" type="textfield" defaultValue="10.0.0.0/24">
+                <Label>Network to scan:</Label>
+            </Field>
+            <Field id="networkNote" type="label" fontSize="small" alignWithControl="true">
+                <Label>For example 10.0.9.0/24. Finds base stations Bonjour can't see, including the AirPort Snow, by checking port 5009 on every address. No password is used for the scan.</Label>
+            </Field>
+            <Field id="createDevices" type="checkbox" defaultValue="true">
+                <Label>Create devices for new base stations:</Label>
+            </Field>
+            <Field id="createNote" type="label" fontSize="small" alignWithControl="true">
+                <Label>New devices use the admin password set in the plugin configuration (if any) and go in the same folder as auto-created devices. Results are written to the event log.</Label>
+            </Field>
+        </ConfigUI>
+    </MenuItem>
     <MenuItem id="refreshAll">
         <Name>Refresh All Base Stations</Name>
         <CallbackMethod>menu_refresh_all</CallbackMethod>
