@@ -193,7 +193,7 @@
         </States>
     </Device>
     <Device type="custom" id="legacyBaseStation">
-        <Name>AirPort Base Station (Graphite / Snow)</Name>
+        <Name>AirPort Base Station (Graphite)</Name>
         <ConfigUI>
             <Field id="address" type="textfield">
                 <Label>IP Address or Hostname:</Label>
@@ -293,6 +293,111 @@
                 <ValueType>Boolean</ValueType>
                 <TriggerLabel>Bridging</TriggerLabel>
                 <ControlPageLabel>Bridging</ControlPageLabel>
+            </State>
+            <State id="contact">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Contact</TriggerLabel>
+                <ControlPageLabel>Contact</ControlPageLabel>
+            </State>
+            <State id="location">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Location</TriggerLabel>
+                <ControlPageLabel>Location</ControlPageLabel>
+            </State>
+            <State id="lastUpdate">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Last Update</TriggerLabel>
+                <ControlPageLabel>Last Update</ControlPageLabel>
+            </State>
+        </States>
+        <UiDisplayStateId>status</UiDisplayStateId>
+    </Device>
+    <Device type="custom" id="acpV1BaseStation">
+        <Name>AirPort Base Station (Snow)</Name>
+        <ConfigUI>
+            <Field id="address" type="textfield">
+                <Label>IP Address or Hostname:</Label>
+            </Field>
+            <Field id="password" type="textfield" secure="true">
+                <Label>Admin Password:</Label>
+            </Field>
+            <Field id="passwordNote" type="label" fontSize="small" alignWithControl="true">
+                <Label>This model uses the original AirPort admin protocol, which sends the password with every request using reversible obfuscation (as Apple's AirPort Admin Utility did). Stored unencrypted in the Indigo database; never logged.</Label>
+            </Field>
+            <Field id="pollInterval" type="textfield" defaultValue="300">
+                <Label>Poll Interval (seconds):</Label>
+            </Field>
+        </ConfigUI>
+        <States>
+            <State id="status">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Status</TriggerLabel>
+                <ControlPageLabel>Status</ControlPageLabel>
+            </State>
+            <State id="credentialStatus">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Credential Status</TriggerLabel>
+                <ControlPageLabel>Credential Status</ControlPageLabel>
+            </State>
+            <State id="name">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Base Station Name</TriggerLabel>
+                <ControlPageLabel>Base Station Name</ControlPageLabel>
+            </State>
+            <State id="networkName">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Network Name</TriggerLabel>
+                <ControlPageLabel>Network Name</ControlPageLabel>
+            </State>
+            <State id="channel">
+                <ValueType>Integer</ValueType>
+                <TriggerLabel>Channel</TriggerLabel>
+                <ControlPageLabel>Channel</ControlPageLabel>
+            </State>
+            <State id="closedNetwork">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>Closed Network</TriggerLabel>
+                <ControlPageLabel>Closed Network</ControlPageLabel>
+            </State>
+            <State id="encryption">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>Encryption (WEP)</TriggerLabel>
+                <ControlPageLabel>Encryption (WEP)</ControlPageLabel>
+            </State>
+            <State id="ipAddress">
+                <ValueType>String</ValueType>
+                <TriggerLabel>IP Address</TriggerLabel>
+                <ControlPageLabel>IP Address</ControlPageLabel>
+            </State>
+            <State id="router">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Router</TriggerLabel>
+                <ControlPageLabel>Router</ControlPageLabel>
+            </State>
+            <State id="subnetMask">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Subnet Mask</TriggerLabel>
+                <ControlPageLabel>Subnet Mask</ControlPageLabel>
+            </State>
+            <State id="natEnabled">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>NAT Enabled</TriggerLabel>
+                <ControlPageLabel>NAT Enabled</ControlPageLabel>
+            </State>
+            <State id="dhcpServerEnabled">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>DHCP Server Enabled</TriggerLabel>
+                <ControlPageLabel>DHCP Server Enabled</ControlPageLabel>
+            </State>
+            <State id="bridging">
+                <ValueType>Boolean</ValueType>
+                <TriggerLabel>Bridging</TriggerLabel>
+                <ControlPageLabel>Bridging</ControlPageLabel>
+            </State>
+            <State id="domainName">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Domain Name</TriggerLabel>
+                <ControlPageLabel>Domain Name</ControlPageLabel>
             </State>
             <State id="contact">
                 <ValueType>String</ValueType>

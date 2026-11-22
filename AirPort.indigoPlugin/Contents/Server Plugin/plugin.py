@@ -17,6 +17,7 @@ import indigo
 from airport_acp import ACPClient, ACPError, AuthenticationError
 from airport_acp import wifi as wifi_ops
 from airport_acp.device import read_states, _uptime_text
+from airport_acp.v1 import ACPv1Client, read_states as v1_read_states
 from airport_legacy import (LegacyBaseStation, LegacyError, SNMPError, SNMPTimeout,
                             discover as legacy_discover, read_states as legacy_read_states)
 
@@ -28,6 +29,7 @@ except ImportError:  # plugin still works by IP address without Bonjour
 PLUGIN_ID = "com.durosity.indigoplugin.airport"
 DEVICE_TYPE = "airportBaseStation"
 LEGACY_TYPE = "legacyBaseStation"
+V1_TYPE = "acpV1BaseStation"
 BONJOUR_SERVICE = "_airport._tcp.local."
 RESTART_GRACE = 300     # seconds a unit may stay unreachable after we restart it
 RESTART_POLL = 15       # poll interval while waiting for a restart to finish
@@ -209,6 +211,9 @@ class Plugin(indigo.PluginBase):
         if dev.deviceTypeId == LEGACY_TYPE:
             self._poll_legacy(dev)
             return
+        if dev.deviceTypeId == V1_TYPE:
+            self._poll_v1(dev)
+            return
         now = time.time()
         if not dev.pluginProps.get("password"):
             self._set_status(dev, "no password", "not set", error=True)
@@ -343,6 +348,33 @@ class Plugin(indigo.PluginBase):
         states["uptime"] = _uptime_text(states.get("uptimeSeconds", 0))
         updates = [{"key": k, "value": v} for k, v in states.items() if k in dev.states]
         updates += [{"key": "status", "value": "online"},
+                    {"key": "lastUpdate", "value": time.strftime("%Y-%m-%d %H:%M:%S")}]
+        dev.updateStatesOnServer(updates)
+        dev.setErrorStateOnServer(None)
+
+    # ------------------------------------------------------------------ Snow (ACP v1)
+    def _poll_v1(self, dev):
+        self.next_poll[dev.id] = time.time() + self._interval(dev)
+        if not dev.pluginProps.get("password"):
+            self._set_status(dev, "no password", "not set", error=True)
+            return
+        client = ACPv1Client(dev.pluginProps.get("address", ""), dev.pluginProps.get("password"))
+        try:
+            states, _values = v1_read_states(client)
+            matches = client.password_matches_device()
+        except AuthenticationError:
+            if dev.states.get("status") != "password rejected":
+                self.logger.error('"%s": the base station rejected the stored password' % dev.name)
+            self._set_status(dev, "password rejected", "password rejected", error=True)
+            return
+        except (ACPError, OSError) as err:
+            if dev.states.get("status") != "offline":
+                self.logger.warning('"%s": not reachable (%s)' % (dev.name, err))
+            self._set_status(dev, "offline", error=True)
+            return
+        updates = [{"key": k, "value": v} for k, v in states.items() if k in dev.states]
+        updates += [{"key": "status", "value": "online"},
+                    {"key": "credentialStatus", "value": "password changed on device" if matches is False else "ok"},
                     {"key": "lastUpdate", "value": time.strftime("%Y-%m-%d %H:%M:%S")}]
         dev.updateStatesOnServer(updates)
         dev.setErrorStateOnServer(None)
