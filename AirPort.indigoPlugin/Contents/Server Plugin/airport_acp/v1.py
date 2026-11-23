@@ -74,9 +74,11 @@ TAGS = {
     "laMA": ("mac", False, "LAN MAC address"),
     "raMA": ("mac", False, "Wi-Fi MAC address"),
     "leAc": ("uint", False, "Status light mode"),
+    "raSt": ("uint", False, "Radio mode (0 = on, 3 = off on newer models)"),
+    "raVs": ("str", False, "Radio firmware version"),
     "moAP": ("str", True, "Secondary phone number"),
 }
-SECRET_TAGS = frozenset({"syPW", "syPR", "syGP", "raWE", "raCr", "moPN", "moAP", "moPW", "pePW", "auNP"})
+SECRET_TAGS = frozenset({"syPW", "syPR", "syGP", "raWE", "raCr", "moPN", "moAP", "moPW", "pePW", "pdPW", "auNP"})
 
 
 def _xor(data):
@@ -154,6 +156,45 @@ class ACPv1Client:
                 continue
             results[key] = _xor(value) if flags & 2 else value
         return results
+
+    def set_raw(self, values, reboot=False):
+        """Write properties ({tag: bytes}); with reboot=True append the reboot flag.
+
+        Request format per Sevy's airport2config: a WRITE header with a streamed
+        body, then elements of tag, flag (2 = value obfuscated), length, value.
+        """
+        body = b""
+        for tag, value in values.items():
+            encrypted = TAGS.get(tag, ("", False))[1]
+            body += message.pack_element(tag, _xor(value) if encrypted else bytes(value), 2 if encrypted else 0)
+        if reboot:
+            body += message.pack_element("acRB", b"", 0)
+        if not body:
+            return
+        header = message.Header(message.CMD_SET_PROPERTY, 0, message.header_key(self.__password), -1, 1,
+                                version=VERSION_1).pack()
+        sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
+        try:
+            sock.sendall(header + body)
+            reply = b""
+            try:
+                while len(reply) < message.HEADER_SIZE:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    reply += chunk
+            except socket.timeout:
+                pass
+        finally:
+            sock.close()
+        if len(reply) >= message.HEADER_SIZE:
+            header = message.Header.unpack(reply[:message.HEADER_SIZE])
+            if header.error_code in (-6754, -16):
+                raise AuthenticationError("password rejected (%s)" % header.error_name)
+            if header.error_code:
+                raise ACPError("set properties failed: %s" % header.error_name)
+        elif not reboot:
+            raise ACPError("no reply to write")
 
     def password_matches_device(self):
         value = self.get_raw(["syPW"], include_secret=True).get("syPW")

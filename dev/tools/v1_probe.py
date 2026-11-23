@@ -33,7 +33,11 @@ print("   not returned:", " ".join(missing) or "none")
 print("== stored password matches:", {True: "yes", False: "NO", None: "n/a"}[client.password_matches_device()])
 
 if "--survey" in sys.argv:
-    codes = sorted(set(PROPERTIES) - set(TAGS) - SECRET_TOP_LEVEL - SECRET_TAGS - {"usrd"})
+    names = set(PROPERTIES)
+    extra = os.path.expanduser("~/acp-test/props.txt")   # full code list, incl. unnamed ones
+    if os.path.exists(extra):
+        names.update(c for c in open(extra).read().split("\n") if len(c) == 4)
+    codes = sorted(names - set(TAGS) - SECRET_TOP_LEVEL - SECRET_TAGS - {"usrd"})
     found = {}
     for i in range(0, len(codes), 25):
         try:
@@ -44,4 +48,4 @@ if "--survey" in sys.argv:
             print("   batch %s.. failed: %s" % (codes[i], err))
     print("== other readable properties (%d of %d tried)" % (len(found), len(codes)))
     for name in sorted(found):
-        print("   %s  %-28s %s" % (name, PROPERTIES[name][1][:28], found[name][:48].hex()))
+        print("   %s  %-28s %s" % (name, PROPERTIES.get(name, ("", ""))[1][:28], found[name][:48].hex()))

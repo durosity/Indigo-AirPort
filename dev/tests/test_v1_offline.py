@@ -8,7 +8,8 @@ from airport_acp.client import AuthenticationError
 PASSWORD = "snowpw"
 STORE = {"syNm": b"Snow Test\x00", "raNm": b"Vintage\x00", "raCh": (11).to_bytes(4, "big"), "raCl": b"\x01",
          "waIP": socket.inet_aton("10.9.8.6"), "waRA": socket.inet_aton("10.9.8.1"), "waSM": socket.inet_aton("255.255.255.0"),
-         "raNA": b"\x00", "raDS": b"\x00", "raWB": b"\x01", "raWM": b"\x00\x00\x00\x01", "syPW": b"snowpw\x00"}
+         "raNA": b"\x00", "raDS": b"\x00", "raWB": b"\x01", "raWM": b"\x00\x00\x00\x01", "syPW": b"snowpw\x00", "raSt": b"\x00\x00\x00\x00"}
+REBOOTS = []
 ENC = {"syNm", "raNm", "waIP", "waRA", "waSM", "raDS", "syPW"}
 seen = []
 
@@ -22,12 +23,35 @@ def serve(srv):
         while len(data) < 128:
             data += conn.recv(4096)
         hdr = message.Header.unpack(data[:128])
-        while len(data) < 128 + hdr.body_size:
-            data += conn.recv(4096)
-        body = data[128:128 + hdr.body_size]
+        if hdr.body_size < 0:            # streamed (writes): read until the client pauses
+            conn.settimeout(0.3)
+            try:
+                while True:
+                    chunk = conn.recv(4096)
+                    if not chunk:
+                        break
+                    data += chunk
+            except socket.timeout:
+                pass
+            body = data[128:]
+        else:
+            while len(data) < 128 + hdr.body_size:
+                data += conn.recv(4096)
+            body = data[128:128 + hdr.body_size]
         seen.append((hdr.version, hdr.key))
         if hdr.key != message.header_key(PASSWORD):
             conn.sendall(message.Header(hdr.command, 1, message.ZERO_KEY, -1, 1, error_code=-16, version=1).pack()); conn.close(); continue
+        if hdr.command == message.CMD_SET_PROPERTY:
+            pos = 0
+            while pos < len(body):
+                name, flags, size = message.unpack_element_header(body[pos:pos + 12])
+                value = body[pos + 12:pos + 12 + size]; pos += 12 + size
+                tag = name.decode()
+                if tag == "acRB":
+                    REBOOTS.append(1)
+                else:
+                    STORE[tag] = _xor(value) if flags & 2 else value
+            conn.sendall(message.Header(hdr.command, 1, message.ZERO_KEY, -1, 1, version=1).pack()); conn.close(); continue
         out, pos = b"", 0
         while pos < len(body):
             name, flags, size = message.unpack_element_header(body[pos:pos + 12]); pos += 12 + size
@@ -55,5 +79,9 @@ try:
     ACPv1Client("127.0.0.1", "wrong", port=port).get_raw(["syNm"]); ok = False
 except AuthenticationError as e:
     print("wrong password ->", e)
+c.set_raw({"raSt": (3).to_bytes(4, "big"), "raNm": b"Renamed\x00"})
+ok &= STORE["raSt"] == (3).to_bytes(4, "big") and STORE["raNm"] == b"Renamed\x00"
+c.set_raw({}, reboot=True); ok &= REBOOTS == [1]
+print("write: raSt ->", STORE["raSt"].hex(), "| raNm ->", STORE["raNm"], "| reboots", len(REBOOTS))
 print("V1 PASSED" if ok else "V1 FAILED")
 srv.close()
