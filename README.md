@@ -4,7 +4,7 @@ Indigo plugin for Apple AirPort base stations and Time Capsules.
 
 Apple stopped making AirPorts in 2018 and AirPort Utility hasn't moved since, but plenty of them are still running. This plugin talks to them directly over Apple's own admin protocol (ACP, TCP port 5009), so you can monitor them and switch their Wi-Fi on and off from Indigo, HomeKit or anything else that can control an Indigo device.
 
-The long-term aim is a replacement for AirPort Utility that covers every model Apple made. This first release covers the 802.11n and 802.11ac generation.
+The long-term aim is a replacement for AirPort Utility that covers every model Apple made. It currently monitors and controls the 802.11n/ac generation, and monitors the original Graphite and Snow base stations.
 
 ## Features
 
@@ -17,6 +17,8 @@ The long-term aim is a replacement for AirPort Utility that covers every model A
 - Restart action
 - Live Wi-Fi state from Bonjour without logging in, with changes picked up the moment a base station re-announces itself
 - Optional auto-creation of devices for base stations found on the network
+- Network scan that also finds the older units Bonjour can't see (Graphite and Snow)
+- Graphite and Snow devices: name, firmware, network name, channel, closed network, WEP, IP settings, NAT/DHCP/bridging, plus uptime and wireless clients on the Graphite
 - Shows "restarting" and "on (pending)" / "off (pending)" while changes take effect
 
 ## Supported models
@@ -28,8 +30,9 @@ The long-term aim is a replacement for AirPort Utility that covers every model A
 | Time Capsule 802.11n (e.g. TimeCapsule6,113) | Tested |
 | Other 802.11n Extremes, Expresses and Time Capsules on 7.x firmware | Expected to work |
 | AirPort Extreme / Time Capsule 802.11ac (7.9.x firmware) | Expected to work, untested |
-| 802.11g "flying saucer" Extreme and original Express | Not yet supported |
-| Original Graphite and Snow base stations | Planned (these use SNMP, not ACP) |
+| AirPort Snow (firmware 4.0.9) | Tested: monitoring (uses the original ACP protocol, version 1) |
+| AirPort Graphite (firmware 3.84) | Tested: monitoring (uses SNMP) |
+| 802.11g "flying saucer" Extreme and original Express | Not yet tested; probably the same protocol as the Snow |
 
 If you try it on a model not marked as tested, please open an issue with the result.
 
@@ -88,7 +91,14 @@ Extra states are added automatically for whatever the unit reports: `sensor_…`
 
 - **Log Discovered Base Stations**: everything seen over Bonjour, with model, firmware and Wi-Fi state
 - **Create Devices for Discovered Base Stations**: creates devices for any discovered unit that doesn't have one
+- **Scan Network for Base Stations...**: checks every address on one or more networks (pre-filled with the ones your devices are on) and finds units Bonjour misses, including the Graphite and Snow; optionally creates devices
 - **Refresh All Base Stations**
+
+### AirPort Base Station (Graphite) and AirPort Base Station (Snow)
+
+Custom devices whose State column shows `status` (online, offline, password rejected, no SNMP reply). States: `name`, `firmware`, `description`, `networkName`, `channel`, `closedNetwork`, `encryption`, `ipAddress`, `router`, `subnetMask`, `natEnabled`, `dhcpServerEnabled`, `bridging`, `contact`, `location`, `lastUpdate`. The Graphite adds `uptime`, `uptimeSeconds`, `clientCount` and `wanInterface`; the Snow adds `credentialStatus`, `domainName` and its MAC addresses.
+
+These models predate encrypted admin connections: the Graphite uses SNMPv1 (the password is the community string) and the Snow sends an obfuscated password with every request. That's how Apple's own AirPort Admin Utility worked too; keep them on a network you trust.
 
 ## Bonjour and VLANs
 
