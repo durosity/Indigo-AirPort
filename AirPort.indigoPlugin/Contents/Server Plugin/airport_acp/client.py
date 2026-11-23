@@ -54,13 +54,35 @@ class _StreamCipher:
         return self._dec.update(data)
 
 
+AUTH_SRP = "srp"          # encrypted session (802.11n/ac firmware 7.x)
+AUTH_HEADER = "header"    # password obfuscated in each message header (older firmware)
+AUTH_AUTO = "auto"
+
+
+class AuthenticationUnsupported(ACPError):
+    """The base station answered but doesn't offer the encrypted (SRP) login."""
+
+
 class ACPClient:
-    def __init__(self, host, password, port=PORT, timeout=10.0):
+    """Client for the current ACP protocol (header version 0x00030001).
+
+    auth:
+      "srp"    encrypted login only (default; what all 7.x firmware supports)
+      "header" no login; the password travels obfuscated (reversibly) in every
+               message header, as older firmware and AirPort Utility 5 did
+      "auto"   try SRP; fall back to "header" only if the base station
+               explicitly refuses the SRP login (never on network errors)
+    After connecting, .auth_used says which one is in effect.
+    """
+
+    def __init__(self, host, password, port=PORT, timeout=10.0, auth=AUTH_SRP):
         self.host, self.port, self.timeout = host, port, timeout
         self.__password = password or ""
         self._sock = None
         self._cipher = None
         self._buffer = b""
+        self.auth = auth
+        self.auth_used = None
 
     def __repr__(self):
         return "<ACPClient %s:%d password=%s>" % (
@@ -81,15 +103,52 @@ class ACPClient:
         self._cipher = None
         self._buffer = b""
 
+    def _login(self):
+        if self.auth_used == AUTH_HEADER or self.auth == AUTH_HEADER:
+            if not self.__password:
+                raise AuthenticationError("no password set")
+            self.auth_used = AUTH_HEADER
+            return
+        try:
+            self.authenticate()
+            self.auth_used = AUTH_SRP
+        except AuthenticationUnsupported:
+            if self.auth != AUTH_AUTO:
+                raise
+        except AuthenticationError:
+            raise
+        except (ACPError, OSError):
+            # Older firmware may simply hang up on the login command. Only treat
+            # that as "unsupported" if the unit still answers an ACP request.
+            if self.auth != AUTH_AUTO or not self._answers_features():
+                raise
+        if self.auth_used != AUTH_SRP:
+            log.debug("%s does not offer the encrypted login; using header authentication", self.host)
+            self.connect()            # the refused attempt may have left the session unusable
+            self.auth_used = AUTH_HEADER
+
+    def _answers_features(self):
+        from .scan import probe, GEN_CURRENT
+        result = probe(self.host, timeout=min(self.timeout, 3.0))
+        return bool(result) and result.get("generation") == GEN_CURRENT
+
     def reconnect(self):
         """Open a fresh connection and log in again (e.g. after the unit hung up)."""
         self.connect()
-        self.authenticate()
+        self._login()
 
     def __enter__(self):
         self.connect()
-        self.authenticate()
+        self._login()
         return self
+
+    @property
+    def _ready(self):
+        return bool(self._cipher) or self.auth_used == AUTH_HEADER
+
+    def _key(self):
+        """Header key: zeros inside an encrypted session, else the obfuscated password."""
+        return message.ZERO_KEY if self._cipher else message.header_key(self.__password)
 
     def __exit__(self, *exc):
         self.close()
@@ -127,8 +186,11 @@ class ACPClient:
                                    cflbinary.compose({"state": 1, "username": "admin"})))
         header, body = self._recv_message()
         if header.error_code:
-            raise ACPError("authentication stage 2 failed: %s" % header.error_name)
-        params = cflbinary.parse(body)
+            raise AuthenticationUnsupported("encrypted login refused at stage 2: %s" % header.error_name)
+        try:
+            params = cflbinary.parse(body)
+        except ValueError:
+            raise AuthenticationUnsupported("unexpected reply to the encrypted login") from None
 
         try:
             srp = SRPClient(self.__password, params["salt"], params["generator"],
@@ -159,13 +221,13 @@ class ACPClient:
         Some properties (e.g. raSR, the Wi-Fi scan) make the base station do
         work before replying, so reads use a longer timeout than connecting.
         """
-        if not self._cipher:
+        if not self._ready:
             raise ACPError("not authenticated")
         names = [n for n in names if include_secret or n not in SECRET_PROPERTIES]
         if not names:
             return {}
         body = b"".join(message.pack_element(n) for n in names)
-        self._send(message.compose(message.CMD_GET_PROPERTY, 4, message.ZERO_KEY, body))
+        self._send(message.compose(message.CMD_GET_PROPERTY, 4, self._key(), body))
         self._sock.settimeout(timeout)
         try:
             return self._read_properties()
@@ -177,6 +239,8 @@ class ACPClient:
         header = message.Header.unpack(self._recv(message.HEADER_SIZE))
         log.debug("get reply: command=%d flags=%d body_size=%d error=%d",
                   header.command, header.flags, header.body_size, header.error_code)
+        if header.error_code in (-16, -6754) and self.auth_used == AUTH_HEADER:
+            raise AuthenticationError("password rejected (%s)" % header.error_name)
         if header.error_code:
             raise ACPError("get properties failed: %s" % header.error_name)
         results = {}
@@ -199,11 +263,11 @@ class ACPClient:
         Callers are responsible for the value bytes; see wifi.py for the
         verified read-modify-write used for configuration changes.
         """
-        if not self._cipher:
+        if not self._ready:
             raise ACPError("not authenticated")
         body = b"".join(message.pack_element(n, v) for n, v in values.items())
         log.debug("set %s (%d bytes)", ", ".join("%s=%d bytes" % (n, len(v)) for n, v in values.items()), len(body))
-        self._send(message.compose(message.CMD_SET_PROPERTY, 0, message.ZERO_KEY, body))
+        self._send(message.compose(message.CMD_SET_PROPERTY, 0, self._key(), body))
         self._sock.settimeout(timeout)
         try:
             header = message.Header.unpack(self._recv(message.HEADER_SIZE))

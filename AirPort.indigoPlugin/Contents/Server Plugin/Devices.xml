@@ -12,6 +12,17 @@
             <Field id="passwordNote" type="label" fontSize="small" alignWithControl="true">
                 <Label>Stored unencrypted in the Indigo database. Never written to the log.</Label>
             </Field>
+            <Field id="authMode" type="menu" defaultValue="auto">
+                <Label>Login method:</Label>
+                <List>
+                    <Option value="auto">Automatic</Option>
+                    <Option value="srp">Encrypted only (firmware 7.x)</Option>
+                    <Option value="header">Legacy (older firmware, e.g. 802.11g)</Option>
+                </List>
+            </Field>
+            <Field id="authNote" type="label" fontSize="small" alignWithControl="true">
+                <Label>Automatic uses the encrypted login, and only falls back to the legacy method (password sent in a reversible form, as AirPort Utility 5 did) if the base station refuses the encrypted one. Once a method works it is remembered.</Label>
+            </Field>
             <Field id="pollInterval" type="textfield" defaultValue="300">
                 <Label>Poll Interval (seconds):</Label>
             </Field>
@@ -190,6 +201,11 @@
                 <TriggerLabel>Last Update</TriggerLabel>
                 <ControlPageLabel>Last Update</ControlPageLabel>
             </State>
+            <State id="loginMethod">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Login Method</TriggerLabel>
+                <ControlPageLabel>Login Method</ControlPageLabel>
+            </State>
         </States>
     </Device>
     <Device type="custom" id="legacyBaseStation">
@@ -318,7 +334,7 @@
         <UiDisplayStateId>status</UiDisplayStateId>
     </Device>
     <Device type="custom" id="acpV1BaseStation">
-        <Name>AirPort Base Station (Snow)</Name>
+        <Name>AirPort Base Station (Snow / early ACP)</Name>
         <ConfigUI>
             <Field id="address" type="textfield">
                 <Label>IP Address or Hostname:</Label>

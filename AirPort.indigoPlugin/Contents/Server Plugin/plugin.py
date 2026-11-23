@@ -197,7 +197,25 @@ class Plugin(indigo.PluginBase):
 
     def _client(self, dev):
         props = dev.pluginProps
-        return ACPClient(props.get("address", ""), props.get("password", ""))
+        return ACPClient(props.get("address", ""), props.get("password", ""),
+                         auth=props.get("authMode", "auto") or "auto")
+
+    def _remember_auth(self, dev, client):
+        """Pin the login method that worked, so 'auto' can never later fall back
+        from the encrypted login to the legacy one."""
+        used = client.auth_used
+        if not used:
+            return
+        if dev.pluginProps.get("authMode", "auto") == "auto":
+            props = dev.pluginProps
+            props["authMode"] = used
+            dev.replacePluginPropsOnServer(props)
+            if used == "header":
+                self.logger.info('"%s": uses the legacy login (password sent in a reversible form, '
+                                 'as with AirPort Utility 5); keep it on a trusted network' % dev.name)
+        label = {"srp": "encrypted", "header": "legacy"}.get(used, used)
+        if dev.states.get("loginMethod") != label:
+            dev.updateStateOnServer("loginMethod", label)
 
     # ------------------------------------------------------------------ polling
     def _poll(self, dev):
@@ -226,6 +244,8 @@ class Plugin(indigo.PluginBase):
             with self._client(dev) as client:
                 states = read_states(client)
                 matches = client.password_matches_device()
+            self._remember_auth(dev, client)
+            dev = indigo.devices[dev.id]
         except AuthenticationError:
             self.logger.error('"%s": the base station rejected the stored password' % dev.name)
             self._set_status(dev, "password rejected", "password rejected", error=True)
@@ -370,10 +390,17 @@ class Plugin(indigo.PluginBase):
             self._set_status(dev, "password rejected", "password rejected", error=True)
             return
         except (ACPError, OSError) as err:
+            if dev.id in self.restarting and time.time() < self.restarting[dev.id]:
+                self._set_status(dev, "restarting")
+                self.next_poll[dev.id] = time.time() + RESTART_POLL
+                return
+            self.restarting.pop(dev.id, None)
             if dev.states.get("status") != "offline":
                 self.logger.warning('"%s": not reachable (%s)' % (dev.name, err))
             self._set_status(dev, "offline", error=True)
             return
+        if self.restarting.pop(dev.id, None) is not None:
+            self.logger.info('"%s": back online after restart' % dev.name)
         updates = [{"key": k, "value": v} for k, v in states.items() if k in dev.states]
         updates += [{"key": "status", "value": "online"},
                     {"key": "credentialStatus", "value": "password changed on device" if matches is False else "ok"},
@@ -447,6 +474,30 @@ class Plugin(indigo.PluginBase):
         radio = plugin_action.props.get("radio", "all")
         radios = None if radio == "all" else [int(radio) - 1]
         self._change_wifi(dev, plugin_action.props.get("state", "on") == "on", radios)
+
+    def action_set_wifi_early(self, plugin_action, dev):
+        from airport_acp.v1 import set_wifi as v1_set_wifi
+        enable = plugin_action.props.get("state", "off") == "on"
+        if not dev.pluginProps.get("password"):
+            self.logger.error('"%s": no admin password set' % dev.name)
+            return
+        client = ACPv1Client(dev.pluginProps.get("address", ""), dev.pluginProps.get("password"))
+        with self.locks.setdefault(dev.id, threading.Lock()):
+            try:
+                result = v1_set_wifi(client, enable, self._backup_dir(), str(dev.id), reboot=True)
+            except AuthenticationError:
+                self.logger.error('"%s": the base station rejected the stored password' % dev.name)
+                return
+            except (ACPError, OSError) as err:
+                self.logger.error('"%s": could not change Wi-Fi: %s' % (dev.name, err))
+                return
+        if not result["written"]:
+            self.logger.info('"%s": Wi-Fi setting is already %s' % (dev.name, "on" if enable else "off"))
+            return
+        self.logger.info('"%s": Wi-Fi setting changed to %s (verified); restarting to apply%s' % (
+            dev.name, "on" if enable else "off",
+            ". Note: this model is known to ignore the setting" if result["radio_may_ignore"] else ""))
+        self._mark_restarting(dev)
 
     def action_restart(self, plugin_action, dev):
         with self.locks.setdefault(dev.id, threading.Lock()):
@@ -675,7 +726,7 @@ class Plugin(indigo.PluginBase):
             return
         for result in found:
             host, gen = result["host"], result["generation"]
-            label = {GEN_V1: "early model (AirPort Snow era)", GEN_CURRENT: "802.11n/ac",
+            label = {GEN_V1: "early model (Snow / early ACP)", GEN_CURRENT: "ACP (802.11n/ac, possibly 802.11g)",
                      GEN_SNMP: "original AirPort (Graphite)"}.get(gen, gen)
             existing = self._device_for_address(host, result["macs"])
             self.logger.info("found %s at %s%s" % (label, host,

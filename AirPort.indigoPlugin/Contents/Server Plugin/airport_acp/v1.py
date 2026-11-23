@@ -229,3 +229,53 @@ def read_states(client):
     if isinstance(wm, str):
         s["encryption"] = any(c not in "0" for c in wm)
     return s, v
+
+
+# Known not to switch the radio despite storing raSt (tested: Snow, firmware 4.0.9).
+RADIO_IGNORES_RASTATE = {1}
+
+
+def set_wifi(client, enable, state_dir, host_id, reboot=True):
+    """Experimental Wi-Fi on/off via a top-level raSt (0 on, 3 off) on ACP v1 units.
+
+    Snapshot every non-secret setting, back it up (0600), write raSt alone,
+    re-read and require that only raSt changed (else write the changed
+    settings back), then restart. Returns a result dict like wifi.set_wifi().
+    """
+    import json, os, time
+    watch = [t for t in TAGS if t not in SECRET_TAGS]
+
+    def snapshot():
+        return {k: v for k, v in client.get_raw(watch).items() if isinstance(v, bytes)}
+
+    before = snapshot()
+    if "raSt" not in before:
+        raise ACPError("this unit does not report raSt")
+    product = int.from_bytes(before.get("syAP", b"\x00"), "big")
+    current = int.from_bytes(before["raSt"], "big")
+    target = 0 if enable else 3
+    result = {"changed": [], "written": False, "rebooted": False, "backup": None,
+              "radio_may_ignore": product in RADIO_IGNORES_RASTATE}
+    if current == target:
+        result["note"] = "already %s" % ("on" if enable else "off")
+        return result
+    os.makedirs(state_dir, exist_ok=True)
+    backup = os.path.join(state_dir, "%s-v1-%s.json" % (host_id, time.strftime("%Y%m%d-%H%M%S")))
+    fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        json.dump({k: v.hex() for k, v in before.items()}, fh, indent=1)
+    result["backup"] = backup
+    new = target.to_bytes(len(before["raSt"]), "big")
+    client.set_raw({"raSt": new})
+    time.sleep(1)
+    after = snapshot()
+    others = sorted(k for k in set(before) | set(after) if k != "raSt" and before.get(k) != after.get(k))
+    if after.get("raSt") != new or others:
+        client.set_raw({k: before[k] for k in others + ["raSt"] if k in before})
+        raise ACPError("read-back check failed (other changes: %s); original written back" % (others or "none"))
+    result["changed"] = [".raSt"]
+    result["written"] = True
+    if reboot:
+        client.set_raw({}, reboot=True)
+        result["rebooted"] = True
+    return result

@@ -11,7 +11,7 @@ import re
 from .client import PropertyError
 from .values import decode
 
-COMMON = ["syNm", "syAM", "syAP", "syVs", "sySN", "syUT", "tmpC", "sySt", "WiFi", "raSL",
+COMMON = ["syNm", "syAM", "syAP", "syVs", "sySN", "syUT", "tmpC", "sySt", "WiFi", "raSL", "raSt", "raCh", "raNm",
           "waIP", "waMA", "waRA", "waSM", "raNA", "raDS", "LEDc", "timz", "ntSV"]
 EXTRAS = ["sySI", "MaSt", "auNN"]
 
@@ -73,7 +73,10 @@ def states_from(values):
     s["problemCount"] = len(problems)
     s["problems"] = ", ".join(PROBLEMS.get(c, c) for c in problems) or "none"
 
-    radios = (g("WiFi") or {}).get("radios", [])
+    radios = (g("WiFi") or {}).get("radios", []) if isinstance(g("WiFi"), dict) else []
+    if not radios and g("raSt") is not None:
+        # Older firmware (no WiFi blob): single radio described by top-level codes
+        radios = [{"raSt": g("raSt"), "raCh": g("raCh"), "raNm": g("raNm")}]
     s["radioCount"] = len(radios)
     s["wifiEnabled"] = any(r.get("raSt") == 0 for r in radios)
     for i, radio in enumerate(radios, 1):

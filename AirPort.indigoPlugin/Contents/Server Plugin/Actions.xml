@@ -21,6 +21,22 @@
             </Field>
         </ConfigUI>
     </Action>
+    <Action id="setWifiEarly" deviceFilter="self.acpV1BaseStation">
+        <Name>Set Wi-Fi On/Off (experimental, early models)</Name>
+        <CallbackMethod>action_set_wifi_early</CallbackMethod>
+        <ConfigUI>
+            <Field id="state" type="menu" defaultValue="off">
+                <Label>Turn Wi-Fi:</Label>
+                <List>
+                    <Option value="on">On</Option>
+                    <Option value="off">Off</Option>
+                </List>
+            </Field>
+            <Field id="note" type="label" fontSize="small" alignWithControl="true">
+                <Label>Writes the radio-mode setting and restarts the base station, with the same backup and read-back checks as the newer models. The AirPort Snow stores the setting but its radio ignores it; this is here for the 802.11g generation.</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
     <Action id="restart" deviceFilter="self.airportBaseStation">
         <Name>Restart Base Station</Name>
         <CallbackMethod>action_restart</CallbackMethod>

@@ -206,4 +206,8 @@ PROPERTIES = {
     'waDS': ('boo', "", "survey"),
     'waIS': ('hex', "", "survey"),
     'waRO': ('boo', "", "survey"),
+    'raSt': ('u32', 'Radio mode (0 on, 3 off)', "survey"),
+    'raCh': ('u32', 'Radio channel', "survey"),
+    'raMd': ('u16', 'Radio PHY mode', "survey"),
+    'raPo': ('u16', 'Radio transmit power', "survey"),
 }

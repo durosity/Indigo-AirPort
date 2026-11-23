@@ -60,9 +60,76 @@ def _read_wifi(client):
     return raw, obj
 
 
+def _has_wifi_blob(client):
+    return isinstance(client.get_raw(["WiFi"]).get("WiFi"), bytes)
+
+
 def wifi_status(client):
+    if not _has_wifi_blob(client):
+        raw = client.get_raw(["raSt"]).get("raSt")
+        if not isinstance(raw, bytes):
+            raise WiFiChangeError("this unit reports neither WiFi nor raSt")
+        return [int.from_bytes(raw, "big")]
     _, obj = _read_wifi(client)
     return [r.get("raSt") for r in obj["radios"]]
+
+
+TOP_LEVEL_WATCH = ["raSt", "raNm", "raCh", "raMd", "raPo", "raNA", "raDS", "waIP", "waRA", "waSM", "syNm"]
+
+
+def _set_wifi_top_level(client, enable, state_dir, host_id, radios, reboot, dry_run):
+    """Older firmware without the WiFi blob (e.g. 802.11g units): a top-level raSt.
+
+    Untested on real hardware: the snapshot check refuses to call a write
+    successful unless raSt changed and nothing else did.
+    """
+    if radios not in (None, [0]):
+        raise WiFiChangeError("this unit has a single radio setting")
+    before = {k: v for k, v in client.get_raw(TOP_LEVEL_WATCH).items() if isinstance(v, bytes)}
+    if "raSt" not in before:
+        raise WiFiChangeError("this unit reports neither WiFi nor raSt")
+    current = int.from_bytes(before["raSt"], "big")
+    target = ON if enable else OFF
+    result = {"changed": [], "written": False, "rebooted": False, "backup": None, "method": "raSt"}
+    if current == target:
+        result["note"] = "already %s" % ("on" if enable else "off")
+        return result
+    result["changed"] = [".raSt"]
+    if dry_run:
+        result["note"] = "dry run: nothing written"
+        return result
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup = os.path.join(state_dir, "%s-raSt-%s.json" % (host_id, stamp))
+    fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        json.dump({k: v.hex() for k, v in before.items()}, fh)
+    result["backup"] = backup
+    new = target.to_bytes(len(before["raSt"]), "big")
+    try:
+        client.set_raw({"raSt": new})
+    except PropertyError:
+        raise
+    except (ACPError, OSError) as err:
+        log.debug("connection lost during write (%s); reconnecting to verify", err)
+        result["reconnected"] = True
+        client.reconnect()
+    try:
+        after = {k: v for k, v in client.get_raw(TOP_LEVEL_WATCH).items() if isinstance(v, bytes)}
+    except (ACPError, OSError):
+        result["reconnected"] = True
+        client.reconnect()
+        after = {k: v for k, v in client.get_raw(TOP_LEVEL_WATCH).items() if isinstance(v, bytes)}
+    others = [k for k in set(before) | set(after) if k != "raSt" and before.get(k) != after.get(k)]
+    if after.get("raSt") != new or others:
+        restore = {k: before[k] for k in others + ["raSt"] if k in before}
+        client.set_raw(restore)
+        raise WiFiChangeError("read-back check failed (raSt %s, other changes %s); original written back"
+                              % (after.get("raSt", b"").hex(), others or "none"))
+    result["written"] = True
+    if reboot:
+        client.reboot()
+        result["rebooted"] = True
+    return result
 
 
 def plan(obj, enable, radios=None, memory=None):
@@ -99,6 +166,8 @@ def set_wifi(client, enable, state_dir, host_id, radios=None, reboot=True, dry_r
     mem_path = os.path.join(state_dir, "%s-wifi-memory.json" % host_id)
     memory = json.load(open(mem_path)) if os.path.exists(mem_path) else {}
 
+    if not _has_wifi_blob(client):
+        return _set_wifi_top_level(client, enable, state_dir, host_id, radios, reboot, dry_run)
     raw, obj = _read_wifi(client)
     new, changed, memory = plan(obj, enable, radios, memory)
     result = {"changed": changed, "written": False, "rebooted": False, "backup": None}
