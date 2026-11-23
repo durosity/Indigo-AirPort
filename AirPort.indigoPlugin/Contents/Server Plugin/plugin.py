@@ -614,17 +614,53 @@ class Plugin(indigo.PluginBase):
         return dev
 
     # ------------------------------------------------------------------ network scan
-    def menu_scan_network(self, values_dict, menu_id):
-        network = (values_dict.get("network") or "").strip()
+    def _known_networks(self):
+        """/24s of existing AirPort devices, plus this Mac's own IPv4 networks."""
+        import ipaddress
+        import socket as _socket
+        seen = []
+        addresses = [d.pluginProps.get("address", "") for d in indigo.devices.iter("self")]
         try:
-            import ipaddress
-            ipaddress.ip_network(network, strict=False)
+            addresses += _socket.gethostbyname_ex(_socket.gethostname())[2]
+        except OSError:
+            pass
+        for address in addresses:
+            try:
+                ip = ipaddress.ip_address(address)
+            except ValueError:
+                continue
+            if ip.version != 4 or ip.is_loopback or ip.is_link_local:
+                continue
+            cidr = str(ipaddress.ip_network("%s/24" % ip, strict=False))
+            if cidr not in seen:
+                seen.append(cidr)
+        return seen
+
+    def getMenuActionConfigUiValues(self, menu_id):
+        values = indigo.Dict()
+        if menu_id == "scanNetwork":
+            values["network"] = ", ".join(self._known_networks())
+            values["createDevices"] = True
+        return values
+
+    def menu_scan_network(self, values_dict, menu_id):
+        import ipaddress
+        networks = [n.strip() for n in (values_dict.get("network") or "").split(",") if n.strip()]
+        try:
+            if not networks:
+                raise ValueError
+            for n in networks:
+                if ipaddress.ip_network(n, strict=False).num_addresses > 4096:
+                    raise ValueError
         except ValueError:
             errors = indigo.Dict()
-            errors["network"] = "Enter a network such as 10.0.9.0/24."
+            errors["network"] = "Enter one or more networks such as 10.0.9.0/24 (no larger than /20)."
             return False, values_dict, errors
         create = bool(values_dict.get("createDevices", True))
-        threading.Thread(target=self._scan_network, args=(network, create), daemon=True).start()
+        def run():
+            for n in networks:
+                self._scan_network(n, create)
+        threading.Thread(target=run, daemon=True).start()
         return True
 
     def _scan_network(self, network, create):
