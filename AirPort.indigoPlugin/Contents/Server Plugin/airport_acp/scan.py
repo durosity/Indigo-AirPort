@@ -9,10 +9,13 @@ without logging in, and the reply's header version tells the generations apart:
 
 import ipaddress
 import socket
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from . import cflbinary, message
 from .client import PORT
+
+GEN_SNMP = "snmp"   # AirPort Graphite: no ACP, answers UDP 192 discovery
 
 GEN_V1 = "v1"
 GEN_CURRENT = "current"
@@ -28,12 +31,41 @@ def _recv_exact(sock, size):
     return data
 
 
-def probe(host, timeout=1.0):
-    """Return {"host", "generation", "macs"} or None if nothing ACP-like answers."""
+def _probe_udp192(host, timeout):
+    try:
+        from airport_legacy.legacy import discover
+        found = discover(host, timeout=timeout)
+    except (ImportError, OSError):
+        return None
+    info = found.get(host)   # only trust a reply from the address we asked
+    if not info:
+        return None
+    return {"host": host, "generation": GEN_SNMP, "macs": {"waMA": info["mac"]},
+            "name": info["name"], "description": info["description"]}
+
+
+def probe(host, timeout=1.0, attempts=2):
+    """Return {"host", "generation", "macs"} or None if nothing AirPort-like answers.
+
+    Early units handle one connection at a time, so a busy unit (for example
+    mid-poll) is retried before giving up.
+    """
+    for attempt in range(attempts):
+        if attempt:
+            time.sleep(0.5)
+        result = _probe_once(host, timeout)
+        if result is not None:      # found (dict) or definitely nothing (False)
+            return result or None
+    return None
+
+
+def _probe_once(host, timeout):
+    """None: something listened on 5009 but the exchange failed (worth a retry);
+    False: nothing there; dict: found."""
     try:
         sock = socket.create_connection((host, PORT), timeout=timeout)
     except OSError:
-        return None
+        return _probe_udp192(host, timeout) or False
     try:
         sock.settimeout(timeout + 2)
         sock.sendall(message.compose(message.CMD_GET_FEATURES, 0, message.header_key("")))

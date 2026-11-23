@@ -309,6 +309,11 @@
                 <TriggerLabel>Last Update</TriggerLabel>
                 <ControlPageLabel>Last Update</ControlPageLabel>
             </State>
+            <State id="firmware">
+                <ValueType>String</ValueType>
+                <TriggerLabel>Firmware</TriggerLabel>
+                <ControlPageLabel>Firmware</ControlPageLabel>
+            </State>
         </States>
         <UiDisplayStateId>status</UiDisplayStateId>
     </Device>

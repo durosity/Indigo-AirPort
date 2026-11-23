@@ -18,7 +18,7 @@ from airport_acp import ACPClient, ACPError, AuthenticationError
 from airport_acp import wifi as wifi_ops
 from airport_acp.device import read_states, _uptime_text
 from airport_acp.v1 import ACPv1Client, read_states as v1_read_states, decode as v1_decode
-from airport_acp.scan import scan as acp_scan, GEN_V1, GEN_CURRENT
+from airport_acp.scan import scan as acp_scan, GEN_V1, GEN_CURRENT, GEN_SNMP
 from airport_acp.values import decode as acp_decode
 from airport_legacy import (LegacyBaseStation, LegacyError, SNMPError, SNMPTimeout,
                             discover as legacy_discover, read_states as legacy_read_states)
@@ -639,12 +639,13 @@ class Plugin(indigo.PluginBase):
             return
         for result in found:
             host, gen = result["host"], result["generation"]
-            label = {GEN_V1: "early model (AirPort Snow era)", GEN_CURRENT: "802.11n/ac"}.get(gen, gen)
+            label = {GEN_V1: "early model (AirPort Snow era)", GEN_CURRENT: "802.11n/ac",
+                     GEN_SNMP: "original AirPort (Graphite)"}.get(gen, gen)
             existing = self._device_for_address(host, result["macs"])
             self.logger.info("found %s at %s%s" % (label, host,
                              ' (device "%s")' % existing.name if existing else ""))
-            if create and not existing and gen in (GEN_V1, GEN_CURRENT):
-                self._create_scanned(host, gen, result["macs"])
+            if create and not existing and gen in (GEN_V1, GEN_CURRENT, GEN_SNMP):
+                self._create_scanned(host, gen, result["macs"], result.get("name", ""))
 
     def _device_for_address(self, host, macs=None):
         wanted = {_norm_mac(m) for m in (macs or {}).values()}
@@ -656,10 +657,10 @@ class Plugin(indigo.PluginBase):
                 return dev
         return None
 
-    def _create_scanned(self, host, gen, macs):
+    def _create_scanned(self, host, gen, macs, reported_name=""):
         password = self.pluginPrefs.get("defaultPassword", "")
-        name = ""
-        if password:   # best effort: use the unit's own name
+        name = reported_name   # the Graphite gives its name without a password
+        if password and not name:   # best effort: use the unit's own name
             try:
                 if gen == GEN_V1:
                     raw = ACPv1Client(host, password, timeout=5).get_raw(["syNm"]).get("syNm")
@@ -670,8 +671,8 @@ class Plugin(indigo.PluginBase):
                     name = acp_decode("syNm", raw) if isinstance(raw, bytes) else ""
             except Exception:
                 name = ""
-        type_id = V1_TYPE if gen == GEN_V1 else DEVICE_TYPE
-        base = name or ("AirPort Snow %s" % host if gen == GEN_V1 else "AirPort %s" % host)
+        type_id = {GEN_V1: V1_TYPE, GEN_SNMP: LEGACY_TYPE}.get(gen, DEVICE_TYPE)
+        base = name or {GEN_V1: "AirPort Snow %s", GEN_SNMP: "AirPort Graphite %s"}.get(gen, "AirPort %s") % host
         props = {"address": host, "password": password, "pollInterval": "300"}
         if gen == GEN_CURRENT:
             props.update({"restartAfterChange": True, "SupportsOnState": True, "SupportsStatusRequest": True,

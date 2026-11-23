@@ -19,6 +19,7 @@ Read-only for now. Writing a configuration requires re-sending all blocks
 with checksums and makes the unit burn its flash and restart.
 """
 
+import re
 import socket
 
 from .snmp import SNMPClient, SNMPError, SNMPErrorStatus, SNMPTimeout
@@ -146,7 +147,7 @@ def discover(host="255.255.255.255", timeout=2.0):
                 "mac": ":".join("%02x" % b for b in data[0x24:0x2A]),
                 "ip": socket.inet_ntoa(data[0x2C:0x30]),
                 "name": data[0x30:0x50].split(b"\x00", 1)[0].decode("mac_roman", "replace"),
-                "uptimeRaw": int.from_bytes(data[0x50:0x54], "big"),
+                "uptimeSeconds": int.from_bytes(data[0x50:0x54], "big") // 100,  # hundredths
                 "description": data[0x54:0x74].split(b"\x00", 1)[0].decode("mac_roman", "replace"),
             }
     finally:
@@ -208,6 +209,8 @@ def read_states(station):
     s = {}
     system = station.system()
     s["description"] = system["description"]
+    match = re.search(r"\bV(\d+(?:\.\d+)+)", system["description"])
+    s["firmware"] = match.group(1) if match else ""
     s["uptimeSeconds"] = system["uptimeSeconds"]
     raw = station.read_config()
     cfg = decode_config(raw)
